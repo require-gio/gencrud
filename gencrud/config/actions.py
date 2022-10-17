@@ -35,20 +35,23 @@ class TemplateActions( TemplateBase ):
         self.__cfg = cfg
         for action in cfg:
             self.__actions.append( TemplateAction( self.parent, objname, **action ) )
-
+        # Disabled for now, user should specify all actions manually
         if not self.has( C_NEW ):
             self.__actions.append( DEFAULT_NEW_ACTION.clone( objname ) )
-
         if not self.has( C_EDIT ):
             self.__actions.append( DEFAULT_EDIT_ACTION.clone( objname ) )
-
         if not self.has( C_DELETE ):
             self.__actions.append( DEFAULT_DELETE_ACTION.clone( objname ) )
-
         return
 
     def __iter__( self ):
         return iter( self.__actions )
+
+    def __len__( self ):
+        return len( self.__actions )
+
+    def __getitem__(self, item):
+        return self.__actions[item]
 
     @property
     def unique( self ):
@@ -78,6 +81,12 @@ class TemplateActions( TemplateBase ):
 
         return False
 
+    def isDialog( self, name ):
+        return self.get( name ).isDialog()
+
+    def isScreen( self, name ):
+        return self.get( name ).isScreen()
+
     def get( self, key ):
         for action in self.__actions:
             if action.name == key:
@@ -101,10 +110,29 @@ class TemplateActions( TemplateBase ):
 
         return result
 
+    def hasRowButtons( self ):
+        # Downward compatibility
+        return self.hasCellButtons()
+
+    def hasCellButtons( self ):
+        for action in self.__actions:
+            if action.position in ( C_CELL, C_ROW ) and action.type != C_NONE and action.hasIcon():
+                return True
+
+        return False
+
     def getCellButtons( self ):
         result = []
         for action in self.__actions:
-            if action.position == C_CELL and action.type != C_NONE:
+            if action.position in ( C_CELL, C_ROW ) and action.type != C_NONE and action.hasIcon():
+                result.append( action )
+
+        return result
+
+    def getRowButtons( self ):
+        result = []
+        for action in self.__actions:
+            if action.position == C_ROW and action.type != C_NONE:
                 result.append( action )
 
         return result
@@ -148,13 +176,6 @@ class TemplateActions( TemplateBase ):
 
         return ''
 
-    def hasRowButtons( self ):
-        for action in self.__actions:
-            if action.position == C_CELL and action.type != C_NONE:
-                return True
-
-        return False
-
     def getFooterButtons( self ):
         result = []
         for action in self.__actions:
@@ -181,7 +202,7 @@ class TemplateActions( TemplateBase ):
         return False
 
     def getScreenActions( self ):
-        return sorted( [ action for action in self.__actions if action.position == 'screen' ],
+        return sorted( [ action for action in self.__actions if action.type == 'screen' and action.position == 'sidebar' ],
                        key = lambda k: k.get( 'index', 0 ) )
 
     @property

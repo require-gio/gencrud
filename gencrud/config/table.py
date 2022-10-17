@@ -17,10 +17,12 @@
 #   Boston, MA 02110-1301 USA
 #
 #
+from collections import defaultdict
 import logging
 from gencrud.config.base import TemplateBase
 from gencrud.config._inports import SourceImport
 from gencrud.config.column import TemplateColumn
+from gencrud.config.inputgroup import InputGroup
 from gencrud.config.tab import TemplateTabs
 from gencrud.config.sort import SortInfo
 from gencrud.config.mixin import TemplateMixin
@@ -28,8 +30,28 @@ import gencrud.util.utils as root
 from gencrud.util.exceptions import *
 from gencrud.constants import *
 from gencrud.util.exceptions import InvalidViewSize
+from typing import List
 
 logger = logging.getLogger()
+
+
+class RelationShip( TemplateBase ):
+    def __init__( self, parent, relation ):
+        TemplateBase.__init__( self, parent )
+        self.__relation = relation
+        return
+
+    @property
+    def cls( self ):
+        return self.__relation.get( C_CLASS )
+
+    @property
+    def table( self ):
+        return self.__relation.get( C_TABLE )
+
+    @property
+    def cascade( self ):
+        return self.__relation.get( C_CASCADE )
 
 
 class TemplateTable( TemplateBase ):
@@ -37,7 +59,9 @@ class TemplateTable( TemplateBase ):
         TemplateBase.__init__( self, parent )
         self.__table            = table
         self.__columns          = []
+        self.__groups           = []
         self.__primaryKey       = ''
+        self.__secondaryKey     = ''
         self.__viewSort         = None
         self.__viewSize         = None
         self.__defaultViewSize  = 10
@@ -54,6 +78,9 @@ class TemplateTable( TemplateBase ):
             if column.isPrimaryKey():
                 self.__primaryKey = column.name
 
+        if C_SECONDARY_KEY in table:
+            self.__secondaryKey = table[C_SECONDARY_KEY]
+
         if C_VIEW_SORT in table:
             self.__viewSort = SortInfo( table[ C_VIEW_SORT ] )
 
@@ -63,6 +90,22 @@ class TemplateTable( TemplateBase ):
 
             else:
                 raise InvalidViewSize()
+
+        groups = defaultdict(list)
+        for column in self.__columns:
+            if column.ui:
+                if column.ui.group:
+                    groups[column.ui.group].append(column)
+                else:
+                    groups[ C_NOGROUP ].append(column)
+            # ad-on for sibling support
+            for sibling in column.siblings:
+                if sibling.ui:
+                    if sibling.ui.group:
+                        groups[sibling.ui.group].append(sibling)
+                    else:
+                        groups[ C_NOGROUP ].append(sibling)
+        self.__groups = [InputGroup(group, fields) for group, fields in groups.items()]
 
         return
 
@@ -76,6 +119,27 @@ class TemplateTable( TemplateBase ):
     @property
     def config( self ):
         return self.object.config
+
+    @property
+    def groups ( self ) -> List[InputGroup]:
+        return self.__groups
+
+    def getFieldByName( self, name ):
+        for column in self.__columns:
+            if column.name == name:
+                return column
+        return None
+
+    def groupInTab( self, group, tab ) -> bool:
+        # iterate through fields of the tab
+        for column in self.tabs().fieldsFor( tab ):
+            # check for overlapping field between group and tab
+            if column in group.fields:
+                return True
+        return False
+
+    def hasInputGroups( self ) -> bool:
+        return len( self.groups ) > 0
 
     def hasTabs( self, tp = C_DIALOG ) -> bool:
         if C_TABS in self.__table:
@@ -94,6 +158,15 @@ class TemplateTable( TemplateBase ):
             return self.__viewSort.htmlMaterialSorting()
 
         return ''
+
+    def columnsHaveMultipleValues( self ) -> bool:
+        for column in self.columns:
+            if len(column.testdata.values) > 1:
+                return True
+        return False
+
+    def maximumTestValues( self ) -> bool:
+        return max( len( column.testdata.values ) for column in self.columns ) 
 
     @property
     def leadIn( self ) -> str:
@@ -121,8 +194,16 @@ class TemplateTable( TemplateBase ):
         return self.__table.get( C_NAME, '' )
 
     @property
-    def orderBy( self ) -> list:
-        return self.__table.get( C_ORDER_BY, [ self.__primaryKey ] )
+    def sortField( self ) -> str:
+        if C_VIEW_SORT in self.__table:
+            return self.__viewSort.field
+        return self.__primaryKey
+
+    @property
+    def sortDirection( self ) -> str:
+        if C_VIEW_SORT in self.__table:
+            return self.__viewSort.direction
+        return C_DESENDING
 
     @property
     def uniqueKey( self ) -> dict:
@@ -152,12 +233,24 @@ class TemplateTable( TemplateBase ):
         return False
 
     @property
+    def relationShips( self ):
+        return [ RelationShip( self, rs ) for rs in self.__table.get( C_RELATION_SHIP, [] ) ]
+
+    @property
+    def relationShipList( self ):
+        return self.__table.get( C_RELATION_SHIP, [] )
+
+    @property
     def columns( self ):
         return self.__columns
 
     @property
     def primaryKey( self ) -> str:
         return self.__primaryKey
+
+    @property
+    def secondaryKey( self ) -> str:
+        return self.__secondaryKey
 
     @property
     def firstTextField( self ):
@@ -169,13 +262,19 @@ class TemplateTable( TemplateBase ):
 
     @property
     def listViewColumns( self ) -> list:
-        return sorted( [ col for col in self.__columns if col.listview.index is not None ],
+        return sorted( [ col for col in self.__columns if col.listview.index is not None ] +
+                       [ sibling for col in self.__columns for sibling in col.siblings if sibling.listview.index is not None ],
                        key = lambda col: col.listview.index )
+
+    @property
+    def uiColumns( self ) -> list:
+        return [ col for col in self.__columns if col.ui is not None ] +\
+                [ sibling for col in self.__columns for sibling in col.siblings if sibling.ui is not None ]
 
     def buildFilter( self ) -> str:
         result = [ ]
         for item in self.listViewColumns:
-            if item.ui.isChoice() or item.ui.isCombobox():
+            if item.ui.isUiType(C_CHOICE, C_CHOICE_AUTO) or item.ui.isUiType(C_COMBOBOX, C_COMBO):
                 result.append( "( this.{0}_Label( record.{0} ) )".format( item.name ) )
 
             elif item.ui.isCheckbox() or item.ui.isSliderToggle():

@@ -29,6 +29,7 @@ import gencrud.util.utils
 from gencrud.configuraton import TemplateConfiguration, my_safe_load
 from gencrud.generators.python import generatePython
 from gencrud.generators.angular import generateAngular
+from gencrud.generators.unittest import generateUnittest
 from gencrud.version import __version__, __author__, __email__, __copyright__
 from gencrud.util.exceptions import ( InvalidEnvironment,
                                       EnvironmentInvalidMissing,
@@ -37,6 +38,9 @@ from gencrud.util.exceptions import ( InvalidEnvironment,
                                       ModuleExistsAlready,
                                       InvalidSetting )
 from gencrud.constants import *
+import pypac.os_settings
+from pypac.parser import PACFile
+from pypac import get_pac
 logger = logging.getLogger()
 
 
@@ -58,7 +62,9 @@ def verifyLoadProject( config: TemplateConfiguration, env ):
 
         else:
             raise Exception( "Could not find the Python Flask configuration file."  )
-
+    #elif env == C_UNITTEST:
+    #    root = config.unittest
+    #    pass
     else:
         raise InvalidEnvironment( env )
 
@@ -130,6 +136,9 @@ def initializeCodeGenerationProcess( input_file ):
     if config.options.generateBackend:
         verifyLoadProject( config, C_PYTHON )
 
+    #if config.options.generateTests:
+    #    verifyLoadProject( config, C_UNITTEST )
+
     else:
         logger.info( "NOT generating backend code" )
 
@@ -144,6 +153,13 @@ def initializeCodeGenerationProcess( input_file ):
         generateAngular( config,
                          [ os.path.abspath( os.path.join( config.angular.templateFolder, t ) )
                                         for t in os.listdir( config.angular.templateFolder ) ] )
+
+    if config.options.generateTests:
+        logger.info( "*** Generating Unittest source code. ***" )
+        generateUnittest( config,
+                         [ os.path.abspath( os.path.join( config.unittest.templateFolder, t ) )
+                                        for t in os.listdir( config.unittest.templateFolder ) ] )
+
     return
 
 
@@ -169,12 +185,17 @@ Parameters:
 Options:
     -h / --help                         This help information.
     -b / --backup                       Make backup of the original project files files.
+    -r / --recurse                      do recursive generation of all templates.
+    -e / --extension <extension>        to override the default extension .yaml 
+    -i / --ignore <folder>              ignore folder (by default all folders starting with 'template' are ignored.   
     -o / --overwrite                    Force overwriting the files.
     -c / --ignore-case-db-ids           All database names shall be in lower case. 
     -M / --module                       Create module component for template and use GenCrudModule.
                                         instead of adding the components directly into app.module.ts   
     -s / --ssl-verify                    Disable the verification of ssl certificate when    
                                         retrieving some external profile data.
+    -p / --proxy <addr|pac>             Using the IP address, url address of the proxy or the address for the PAC file
+    -P / --proxy-system                 Use system proxy Windows Only 
     -v                                  Verbose option, prints what the tool is doing.
     -V / --version                      Print the version of the tool.
 ''' )
@@ -186,20 +207,28 @@ def main():
     logging.basicConfig( format = FORMAT, level=logging.WARNING, stream = sys.stdout )
     try:
         opts, args = getopt.getopt( sys.argv[1:],
-                                    'hi:s:obvVcM', [ 'help',
-                                                     'input=',
-                                                     'ssl-verify=',
-                                                     'overwrite',
-                                                     'backup'
-                                                     'module'
-                                                     'version',
-                                                     'ignore-case-db-ids' ] )
+                                    'hs:obvVcMri:e:np:P', [ 'help',
+                                                        'ssl-verify=',
+                                                        'overwrite',
+                                                        'backup',
+                                                        'module',
+                                                        'recursive',
+                                                        'ignore=',
+                                                        'extension='
+                                                        'version',
+                                                        'ignore-case-db-ids',
+                                                        'proxy=',
+                                                        'proxy-system',
+                                                        'nltk-update' ] )
 
     except getopt.GetoptError as err:
         # print help information and exit:
         usage( str( err ) )
         sys.exit( 2 )
 
+    ignoreFolders = [ ]
+    recursive = False
+    extension   = '.yaml'
     try:
         for o, a in opts:
             if o == '-v':
@@ -212,6 +241,15 @@ def main():
             elif o in ( '-h', '--help' ):
                 usage()
                 sys.exit()
+
+            elif o in ('-r', '--recursive'):
+                recursive = True
+
+            elif o in ('-e', '--extension'):
+                extension = a
+
+            elif o in ('-i', '--ignore'):
+                ignoreFolders.append( a )
 
             elif o in ( '-M', '--module' ):
                 gencrud.util.utils.useModule = True
@@ -232,6 +270,49 @@ def main():
             elif o.lower() in ( '-s', '--ssl-verify' ):
                 gencrud.util.utils.sslVerify = a.lower() == 'true'
 
+            elif o.lower() in ( '-P', '--proxy-system' ):
+                if pypac.os_settings.ON_WINDOWS:
+                    gencrud.util.utils.proxyUrl = get_pac( url = pypac.os_settings.autoconfig_url_from_registry() )
+
+                else:
+                    raise Exception( "use manual proxy settings" )
+
+            elif o.lower() in ( '-p', '--proxy' ):
+                pacFile = None
+                if a.startswith( 'http' ):
+                    if a.endswith( '.pac' ):
+                        # PAC file
+                        pacFile = a
+                    else:
+                        # URL
+                        gencrud.util.utils.proxyUrl = a
+
+                elif a[0].isdigit():
+                    import socket
+                    try:
+                        socket.inet_aton( a.split( ':' )[ 0 ] )
+                        # legal IP address
+                        gencrud.util.utils.proxyUrl = a
+
+                    except socket.error:
+                        # Not legal
+                        if os.path.isfile( a ) and os.path.exists( a ):
+                            # PAC file
+                            pacFile = a
+
+                if pacFile is not None:
+                    if pacFile.startswith( 'http' ):
+                        pac = get_pac( url = pacFile )
+
+                    else:
+                        with open( pacFile, 'r' ) as stream:
+                            pac = PACFile( stream.read() )
+
+                    gencrud.util.utils.proxyUrl = pac
+
+            elif o.lower() in ( '-n', '--nltk-update' ):
+                gencrud.util.utils.update_nltk()
+
             else:
                 assert False, 'unhandled option'
 
@@ -241,18 +322,52 @@ def main():
             sys.exit( 1 )
 
         banner()
-        for arg in args:
-            if '*' in arg:
-                # Wild card handling
-                for filename in glob.glob( os.path.abspath( os.path.expanduser( arg ) ) ):
-                    print( "Filename: {} from wildcard".format( filename ) )
-                    if filename.lower().endswith( '.yaml' ):
-                        # process the configuration file and create code files
+        if recursive:
+            def doRecursiveFolders( path, extension, ignore_folders ):
+                with os.scandir(path) as it:
+                    for entry in it:
+                        entry: os.DirEntry
+                        if entry.name.startswith('.') and entry.is_dir():
+                            print( f'Skipping: {entry.name}')
+                            continue
+
+                        if entry.is_dir():
+                            if entry.name in ignore_folders:
+                                print(f'Skipping: {entry.name}')
+                                continue
+
+                            elif entry.name.startswith( 'template' ):
+                                print(f'Skipping: {entry.name}')
+                                continue
+
+                            else:
+                                doRecursiveFolders( os.path.join( path, entry.name ), extension, ignore_folders )
+                                continue
+
+                        if not entry.name.endswith( extension ):
+                            print(f'Skipping: {entry.name}')
+                            continue
+
+                        filename = os.path.join( path, entry.name )
+                        print( f"Filename: {filename} from wildcard" )
                         initializeCodeGenerationProcess( filename )
 
-            else:
-                print( "Filename: {}".format( arg ) )
-                initializeCodeGenerationProcess( arg )
+            for arg in args:
+                doRecursiveFolders( os.path.abspath( os.path.expanduser( arg ) ), extension, ignoreFolders )
+
+        else:
+            for arg in args:
+                if '*' in arg:
+                    # Wild card handling
+                    for filename in glob.glob( os.path.abspath( os.path.expanduser( arg ) ) ):
+                        print( f"Filename: {filename} from wildcard" )
+                        if filename.lower().endswith( extension ):
+                            # process the configuration file and create code files
+                            initializeCodeGenerationProcess( filename )
+
+                else:
+                    print( "Filename: {}".format( arg ) )
+                    initializeCodeGenerationProcess( arg )
 
         print( "Done" )
 
@@ -267,7 +382,7 @@ def main():
     except FileNotFoundError as exc:
         logger.error( "File not found" )
         if exc.filename in args:
-            logger.error( "Input file '{0}' is not found.".format( exc.filename ) )
+            logger.error( f"Input file '{exc.filename}' is not found." )
 
         else:
             logger.debug( traceback.format_exc() )

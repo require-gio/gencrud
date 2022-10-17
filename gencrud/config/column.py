@@ -20,11 +20,13 @@ import logging
 from nltk.tokenize import word_tokenize
 from gencrud.config.listview import TemplateListView
 from gencrud.config.relation import TemplateRelation
+from gencrud.config.testdata import TemplateTestData
 from gencrud.config.ui import TemplateUi
 from gencrud.config.tab import TemplateTab
 from gencrud.config.base import TemplateBase
 from gencrud.util.exceptions import InvalidSetting
 from gencrud.constants import *
+from gencrud.util.validators import Validator, ValidatorType
 import gencrud.util.utils as root
 from gencrud.util.exceptions import MissingAttribute
 logger = logging.getLogger()
@@ -68,24 +70,43 @@ class TemplateColumn( TemplateBase ):
                           'TEXT': 'API.db.LONGTEXT',
                           'TIME': 'API.db.Time' }
 
+    NATIVE_PY_TYPES_FROM_SQL = { 'CHAR': 'str',
+                          'VARCHAR': 'str',
+                          'INT': 'int',
+                          'BIGINT': 'int',
+                          'BOOLEAN': 'bool',
+                          'BOOL': 'bool',
+                          'TIMESTAMP': 'str',
+                          'DATETIME': 'str',
+                          'DATE': 'str',
+                          'FLOAT': 'float',
+                          'REAL': 'float',
+                          'INTERVAL': 'tuple',
+                          'BLOB': 'bytes',
+                          'NUMERIC': 'float',
+                          'DECIMAL': 'int',
+                          'CLOB': 'str',
+                          'TEXT': 'str',
+                          'TIME': 'str' }
+
     SCHEMA_TYPES_FROM_SQL = { 'CHAR': 'String',
-                        'VARCHAR': 'String',
-                        'INT': 'Integer',
-                        'BIGINT': 'Integer',
-                        'BOOLEAN': 'Boolean',
-                        'BOOL': 'Boolean',
-                        'TIMESTAMP': 'DateTime',
-                        'DATETIME': 'DateTime',
-                        'DATE': 'Date',
-                        'FLOAT': 'Float',
-                        'REAL': 'Float',
-                        'INTERVAL': 'Integer',
-                        'BLOB': 'String',
-                        'NUMERIC': 'Decimal',
-                        'DECIMAL': 'Decimal',
-                        'CLOB': 'String',
-                        'TEXT': 'String',
-                        'TIME': 'Time' }
+                          'VARCHAR': 'String',
+                          'INT': 'Integer',
+                          'BIGINT': 'Integer',
+                          'BOOLEAN': 'Boolean',
+                          'BOOL': 'Boolean',
+                          'TIMESTAMP': 'DateTime',
+                          'DATETIME': 'DateTime',
+                          'DATE': 'Date',
+                          'FLOAT': 'Float',
+                          'REAL': 'Float',
+                          'INTERVAL': 'Integer',
+                          'BLOB': 'String',
+                          'NUMERIC': 'Decimal',
+                          'DECIMAL': 'Decimal',
+                          'CLOB': 'String',
+                          'TEXT': 'String',
+                          'TIME': 'Time' }
 
     def __init__( self, parent, table_name, **cfg ):
         """
@@ -98,6 +119,7 @@ class TemplateColumn( TemplateBase ):
         self.__tableName    = table_name
         self.__config       = cfg
         self.__field        = ''
+        self.__testdata     = None
         self.__sqlType      = ''
         self.__length       = 0
         self.__relationShip = None
@@ -106,6 +128,9 @@ class TemplateColumn( TemplateBase ):
         self.__ui           = None
         self.__leadIn       = []
         self.__dbField      = ''
+        self.unique         = False
+        self._isSibling      = cfg.get( C_ISSIBLING, False)
+        self._siblings       = []
         if C_FIELD not in self.__config:
             raise MissingAttribute( C_TABLE, C_FIELD )
 
@@ -127,6 +152,7 @@ class TemplateColumn( TemplateBase ):
         # DEFAULT <value>
         # PRIMARY KEY
         # AUTO NUMBER
+        # UNIQUE
         # FOREIGN KEY <reference>
         while offset < len( tokens ):
             if tokens[ offset ] == 'NULL':
@@ -149,6 +175,9 @@ class TemplateColumn( TemplateBase ):
             elif tokens[ offset ] == 'AUTO':
                 self.__attrs.append( 'AUTO NUMBER' )
 
+            elif tokens[ offset ] == 'UNIQUE':
+                self.__attrs.append( 'UNIQUE' )
+
             elif tokens[ offset ] == 'FOREIGN':
                 self.__attrs.append( 'FOREIGN KEY {0}'.format( tokens[ offset + 2 ] ) )
                 offset += 1
@@ -161,8 +190,16 @@ class TemplateColumn( TemplateBase ):
         if C_UI in cfg and type( cfg[ C_UI ] ) is dict:
             self.__ui = TemplateUi( self, **cfg.get( C_UI, {} ) )
 
+        if C_SIBLINGS in cfg and type( cfg[ C_SIBLINGS ] ) is list:
+            for subConfig in cfg[ C_SIBLINGS ]:
+                subConfig[ C_ISSIBLING ] = True
+                # TODO: check necessity
+                subConfig[ C_FIELD ] = cfg.get( C_FIELD, '' )
+                self._siblings.append( TemplateColumn( parent, table_name, **subConfig ) )
+
         self.__relationShip = TemplateRelation( self, **self.__config.get( C_RELATION_SHIP, {} ) )
         self.__listview     = TemplateListView( self, **self.__config.get( C_LIST_VIEW, {} ) )
+        self.__testdata     = TemplateTestData( self, **self.__config.get( C_TEST_DATA, {} ))
 
         if root.config.options.ignoreCaseDbIds:
             self.__dbField = self.__dbField.lower()
@@ -191,6 +228,14 @@ class TemplateColumn( TemplateBase ):
     @property
     def object( self ):
         return self.table.object
+
+    @property
+    def isSibling( self ):
+        return self._isSibling
+
+    @property
+    def siblings( self ):
+        return self._siblings
 
     @property
     def leadIn( self ) -> list:
@@ -228,6 +273,13 @@ class TemplateColumn( TemplateBase ):
     @property
     def listview( self ):
         return self.__listview
+    
+    @property
+    def testdata( self ):
+        return self.__testdata
+
+    def hasTestdata( self ):
+        return C_TEST_DATA in self.__config
 
     def hasResolveList( self ) -> bool:
         return self.__ui is not None and self.__ui.hasResolveList()
@@ -235,8 +287,14 @@ class TemplateColumn( TemplateBase ):
     def hasService( self ) -> bool:
         return self.__ui is not None and self.__ui.hasService()
 
+    def hasServiceBaseClass( self ) -> bool:
+        return self.__ui is not None and self.__ui.hasServiceBaseClass()
+
     def __repr__(self):
         return "<TemplateColumn name='{}' label='{}'".format( self.name, self.label )
+
+    def __eq__(self, other):
+        return self.name == other.name
 
     def definedNotNull( self ) -> bool:
         return not self.sqlAttrs2Dict()[ 'nullable' ]
@@ -280,6 +338,12 @@ class TemplateColumn( TemplateBase ):
 
     @property
     def name( self ) -> str:
+        if self.isSibling:
+            return self.__field + "_" + self.label.upper().replace(" ", "_")
+        return self.__field
+
+    @property
+    def fieldName( self ) -> str:
         return self.__field
 
     def hasLabel( self ) -> bool:
@@ -298,6 +362,14 @@ class TemplateColumn( TemplateBase ):
 
     def hasForeign( self ) -> bool:
         return 'FOREIGN KEY' in self.__attrs
+
+    @property
+    def foreignReferenceID( self ) -> str:
+        if self.__ui is not None and isinstance(self.__ui.serviceLabel, str):
+            # remove the last item of the label string since that is the actual label but we want
+            # the foreign key id of the row that contains the label. Also, remove the "_FK" at the end
+            return self.__field + "_FK." +  ".".join(self.__ui.serviceLabel.split(".")[:-1])[:-3]
+        return None
 
     @property
     def ui( self ):
@@ -344,9 +416,23 @@ class TemplateColumn( TemplateBase ):
         raise Exception( 'Invalid SQL type: {0} for field {1}'.format( self.__sqlType, self.name ) )
 
     @property
+    def nativePythonType( self ) -> str:
+        if self.__sqlType in self.NATIVE_PY_TYPES_FROM_SQL:
+            return self.NATIVE_PY_TYPES_FROM_SQL[ self.__sqlType ]
+
+        raise Exception( 'Invalid SQL type: {0} for field {1}'.format( self.__sqlType, self.name ) )
+
+    @property
     def tsType( self ) -> str:
         if self.__sqlType in self.TS_TYPES_FROM_SQL:
             return self.TS_TYPES_FROM_SQL[ self.__sqlType ]
+
+        raise Exception( 'Invalid SQL type: {0}'.format( self.__sqlType ) )
+
+    @property
+    def schemaType( self ):
+        if self.__sqlType in self.TS_TYPES_FROM_SQL:
+            return self.SCHEMA_TYPES_FROM_SQL[ self.__sqlType ]
 
         raise Exception( 'Invalid SQL type: {0}'.format( self.__sqlType ) )
 
@@ -371,8 +457,9 @@ class TemplateColumn( TemplateBase ):
     def sqlAttrs2Dict( self ):
         options = { 'autoincrement': False,
                     'primary_key': False,
-                    'nullable': False,
+                    'nullable': True,
                     'foreign_key': None,
+                    'unique': False,
                     'default': None,
                   }
         for attr in self.__attrs:
@@ -381,8 +468,13 @@ class TemplateColumn( TemplateBase ):
 
             elif 'PRIMARY KEY' in attr:
                 options[ 'primary_key'] = True
+                options[ 'nullable'] = False
 
             elif 'NOT NULL' in attr:
+                options[ 'nullable' ] = False
+
+            elif 'UNIQUE' in attr:
+                options[ 'unique' ] = True
                 options[ 'nullable' ] = False
 
             elif attr.startswith( 'FOREIGN KEY' ):
@@ -417,9 +509,7 @@ class TemplateColumn( TemplateBase ):
 
     def sqlAlchemyDef( self ) -> str:
         """
-
             https://docs.sqlalchemy.org/en/latest/core/metadata.html#sqlalchemy.schema.Column
-
         :return:
         """
         if root.config.options.ignoreCaseDbIds:
@@ -441,12 +531,16 @@ class TemplateColumn( TemplateBase ):
             elif 'NOT NULL' in attr:
                 result += ', nullable = False'
 
-            elif attr.startswith( 'FOREIGN KEY' ):
-                if root.config.options.ignoreCaseDbIds:
-                    result += ', API.db.ForeignKey( "{0}" )'.format( attr.split( ' ' )[ 2 ].lower() )
+            elif 'UNIQUE' in attr:
+                result += ', unique = True'
 
+            elif attr.startswith( 'FOREIGN KEY' ):
+                foreignKeyName = attr.split( ' ' )[ 2 ].lower() if root.config.options.ignoreCaseDbIds else attr.split( ' ' )[ 2 ]
+                if 'NULL' in self.__attrs and 'NOT NULL' not in self.__attrs:
+                    # TODO: maybe better to set to default if it is specified
+                    result += ', API.db.ForeignKey( "{0}", ondelete = "SET NULL" )'.format( foreignKeyName )
                 else:
-                    result += ', API.db.ForeignKey( "{0}" )'.format( attr.split( ' ' )[ 2 ] )
+                    result += ', API.db.ForeignKey( "{0}", ondelete = "CASCADE" )'.format( foreignKeyName )
 
             elif attr.startswith( 'DEFAULT' ):
                 value = attr.split( ' ' )[ 1 ]
@@ -486,6 +580,9 @@ class TemplateColumn( TemplateBase ):
 
                     result += ', default = {mod}.{call}'.format( mod = module_name, call = function )
 
+        if self.unique:
+            result += ", unique = {}".format( self.unique )
+
         result += ' )'
         return result
 
@@ -509,6 +606,23 @@ class TemplateColumn( TemplateBase ):
 
             return defValue, module_name, function
 
+        return None
+
+    @property 
+    def dbField( self ):
+        return self.__dbField
+
+    def serviceClass( self, modules: list, table: str ):
+        for module in modules:
+            if module.get("table") == table:
+                return module.get("model")
+        return None
+
+    @property 
+    def foreignKey ( self ):
+        for attr in self.__attrs:
+            if "FOREIGN KEY" in attr:
+                return attr.split(" ")[-1]
         return None
 
     @property
@@ -536,7 +650,19 @@ class TemplateColumn( TemplateBase ):
 
         return '[ {} ] '.format( result )
 
-    def angularUiInput( self ):
+    @property
+    def validatorsList( self ):
+        result = []
+        if not self.isPrimaryKey():
+            if 'NOT NULL' in self.__attrs or self.hasForeign():
+                result.append(Validator(ValidatorType.REQUIRED, True))
+
+            if self.__length > 0:
+                result.append(Validator(ValidatorType.MAXLENGTH, self.__length))
+
+        return result
+
+    def angularUiInput( self, mixin="" ):
         if self.__ui is None:
             raise Exception( "Missing 'ui' group for column {} on table {}".format( self.__field,
                                                                                     self.__tableName ) )
@@ -544,12 +670,20 @@ class TemplateColumn( TemplateBase ):
             return self.build()
 
         return self.__ui.buildInputElement( self.__tableName,
-                                            self.__field,
-                                            self.__config.get( C_LABEL, '' ) )
+                                            self.name,
+                                            self.__config.get( C_LABEL, '' ),
+                                            mixin = mixin,
+                                            validators=self.validatorsList )
 
     @property
     def readonly( self ) -> bool:
         return self.__config.get( C_READ_ONLY, False )
+
+    @property
+    def group( self ):
+        if self.ui:
+            return self.ui.group
+        return None
 
     @property
     def disabled( self ) -> bool:

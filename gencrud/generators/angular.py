@@ -32,6 +32,7 @@ from gencrud.util.typescript import TypeScript
 from gencrud.util.positon import PositionInterface
 from gencrud.util.sha import sha256sum
 import posixpath
+import time
 
 logger = logging.getLogger()
 
@@ -399,9 +400,14 @@ def generateAngular( config: TemplateConfiguration, templates: list ):
 
         servicesList = ServicesList()
         for field in cfg.table.columns:
-            if ( field.ui is not None and (field.ui.isChoice() or field.ui.isCombobox()) ) and field.hasService():
+            if field.ui is not None and field.ui.isUiType(C_CHOICE, C_CHOICE_AUTO, C_COMBOBOX, C_COMBO, C_CHECKBOX) and field.hasService():
                 field.ui.service.fieldLabel = field.label
                 servicesList.append( field.ui.service )
+            # required ad-on for the support of siblings, i.e., multiple usage of the same database field
+            for sibling in field.siblings:
+                if sibling.ui is not None and sibling.ui.isUiType(C_CHOICE, C_CHOICE_AUTO, C_COMBOBOX, C_COMBO, C_CHECKBOX) and sibling.hasService():
+                    sibling.ui.service.fieldLabel = sibling.label
+                    servicesList.append( sibling.ui.service )
 
         for templ in templates:
             templateFilename = os.path.join( config.angular.sourceFolder,
@@ -499,6 +505,8 @@ def generateAngular( config: TemplateConfiguration, templates: list ):
                 else:
                     appModule = gencrud.util.utils.joinJson( appModule, data )
 
+            # This is just to give the OS some time to actually close the file
+            time.sleep(.01)
             os.remove( app_module_json_file )
 
         exportsModules.append( { 'application':   app,
@@ -535,9 +543,7 @@ def generateAngular( config: TemplateConfiguration, templates: list ):
     updateAngularAppModuleTs( config, appModule, exportsModules )
 
     os.remove( os.path.join( config.angular.sourceFolder, 'app.module.json' ) )
-    copyAngularCommon( config, os.path.abspath( os.path.join( os.path.dirname( __file__ ),
-                                                      '..',
-                                                      'common-ts' ) ),
+    copyAngularCommon( config, config.angular.commonFolder,
                        os.path.join( config.angular.sourceFolder, 'common' ) )
     return
 

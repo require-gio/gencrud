@@ -17,9 +17,13 @@
 #   Boston, MA 02110-1301 USA
 #
 C_APPLICATION           = 'application'
+C_FILE                  = 'file'
 C_FILENAME              = 'filename'
+C_FILTER                = 'filter'
+C_BASECLASS             = 'base-class'
 C_CLASS                 = 'class'
 C_MODULE                = 'module'
+C_GROUP                 = 'group'
 C_MODULES               = 'modules'
 C_OPTIONS               = 'options'
 C_REFERENCES            = 'references'
@@ -34,6 +38,7 @@ C_BACKUP                = 'backup'
 C_IGNORE_CASE_DB_IDS    = 'ignore-case-db-ids'
 C_OVERWRITE             = 'overwrite'
 C_LAZY_LOADING          = 'lazy-loading'
+C_SORT                  = 'sort'
 
 C_APP_MODULE            = 'app-module'
 C_APP_ROUTING           = 'app-routing'
@@ -46,7 +51,7 @@ C_TEMPLATES_DIR         = 'templates'
 C_ANGULAR               = 'angular'
 C_TYPESCRIPT            = 'typescript'
 C_TEMPLATE              = 'template'
-C_TEMPLATE              = 'templates'
+C_UNITTEST              = 'unittest'
 
 C_PLATFORM_LINUX        = 'linux'
 C_PLATFORM_WINDOS       = 'windows'
@@ -85,10 +90,15 @@ C_PARAMS                = 'params'
 C_ON                    = 'on'
 C_FUNCTION              = 'function'
 
+C_EXPORT                = 'export'
+C_DIALOGS               = 'dialogs'
 C_DIALOG                = 'dialog'
+C_COMPONENTS            = 'components'
+C_SERVICES              = 'services'
 C_SCREEN                = 'screen'
 C_LIST                  = 'list'
 C_API                   = 'api'
+C_DIRECTIVE             = 'directive'
 
 C_CELL                  = 'cell'
 C_ROW                   = 'row'
@@ -100,8 +110,12 @@ C_DBLCLICK              = 'dblclick'
 C_DOUBLE_CLICK          = 'dblclick'
 C_MIXIN                 = 'mixin'
 
-C_ACTION_TYPES          = ( C_DIALOG, C_SCREEN, C_LIST, C_API, C_NONE )
-C_ACTION_POSITIONS      = ( C_CELL, C_HEADER, C_FOOTER, C_ROW, C_NONE, C_SCREEN )
+C_LEFT                  = 'left'
+C_RIGHT                 = 'right'
+C_SIDEBAR               = 'sidebar'
+
+C_ACTION_TYPES          = ( C_DIALOG, C_SCREEN, C_LIST, C_API, C_DIRECTIVE, C_NONE )
+C_ACTION_POSITIONS      = ( C_CELL, C_HEADER, C_FOOTER, C_ROW, C_NONE, C_SCREEN, C_LEFT, C_RIGHT, C_SIDEBAR )
 C_ACTION_ATTRIBUTES     = ( C_FUNCTION,
                             C_NAME,
                             C_LABEL,
@@ -136,9 +150,9 @@ C_TAB_GROUP_TAG         = 'grouptag'
 C_MIXIN                 = 'mixin'
 C_VIEW_SORT             = 'viewSort'
 C_VIEW_SIZE             = 'viewSize'
-C_ORDER_BY              = 'order-by'
 C_UNIQUE_KEY            = 'unique-key'
 C_UNIQUE                = 'unique'
+C_SECONDARY_KEY         = 'secondary-key'
 
 C_ASCENDING             = 'asc'
 C_DESENDING             = 'desc'
@@ -200,25 +214,35 @@ C_LABEL_POSITION        = 'labelPosition'
 C_RESOLVE_LIST          = 'resolve-list'
 C_RESOLVE_LIST_OLD      = 'resolveList'
 C_VALUE                 = 'value'
+C_VALUES                = 'values'
 C_CONSTANT_FORMAT       = 'constant-format'
 C_AFTER                 = 'after'
 C_BEFORE                = 'before'
 
 C_DEBUG                 = 'debug'
+C_SIBLINGS              = 'siblings'
+C_ISSIBLING             = 'isSibling'
 
 C_FIELD_NAME            = 'field-name'
 C_LAZY                  = 'lazy'
 C_WIDTH                 = 'width'
 C_UI                    = 'ui'
 C_LIST_VIEW             = 'listview'
+C_TEST_DATA             = 'test-data'
 C_RELATION_SHIP         = 'relationship'
 C_AUTO_UPDATE           = 'autoupdate'
 C_DEFAULT               = 'default'
+C_DEFAULTS              = 'defaults'
+C_INIT                  = 'init'
 C_INITIAL_VALUE         = 'initialValue'
 C_READ_ONLY             = 'readonly'
 
 C_GENERATE_FRONTEND     = 'generate-frontend'
 C_GENERATE_BACKEND      = 'generate-backend'
+C_GENERATE_TESTS        = 'generate-tests'
 
-C_GENCRUD_TEMPLATES = 'GENCRUD_TEMPLATES'
-C_GENCRUD = 'GENCRUD'
+C_GENCRUD_TEMPLATES     = 'GENCRUD_TEMPLATES'
+C_GENCRUD               = 'GENCRUD'
+
+C_NOTAB                 = 'notab'
+C_NOGROUP               = 'nogroup'

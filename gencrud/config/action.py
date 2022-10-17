@@ -33,6 +33,15 @@ class TemplateAction( TemplateBase ):
         self.__cfg = cfg
         return
 
+    def isDialog( self ):
+        return self.position != 'none' and self.type == 'dialog'
+
+    def isScreen( self ):
+        return self.position != 'none' and self.type == 'screen'
+
+    def isMixin( self ):
+        return self.position != 'none' and self.type == 'mixin'
+
     @property
     def module( self ):
         return self.parent.module
@@ -41,24 +50,31 @@ class TemplateAction( TemplateBase ):
     def name( self ):
         result = self.__cfg.get( C_NAME, None )
         if result is None:
-            raise InvalidSetting( C_NAME, C_ACTION, self.name )
+            raise InvalidSetting( C_NAME, C_ACTION, self.__name )
 
         return result
 
     @property
     def type( self ):
-        result = self.__cfg.get( C_TYPE, C_ACTION_TYPES[ -1 ] )
+        # TODO: This should nolong be nessary as we have the schema.py now
+        result = self.__cfg.get( C_TYPE, C_ACTION_TYPES[ -1 ] ).lower()
         if result not in C_ACTION_TYPES:
-            raise InvalidSetting( C_TYPE, C_ACTION, self.name )
+            raise InvalidSetting( C_TYPE, C_ACTION, self.__name )
 
         return result
 
     @property
     def position( self ):
-        result = self.__cfg.get( C_POSITION, C_ACTION_POSITIONS[ -1 ] )
+        # TODO: This should nolong be nessary as we have the schema.py now
+        result = self.__cfg.get( C_POSITION, C_ACTION_POSITIONS[ -1 ] ).lower()
         if result not in C_ACTION_POSITIONS:
-            raise InvalidSetting( C_POSITION, C_ACTION, self.name )
+            raise InvalidSetting( C_POSITION, C_ACTION, self.__name )
 
+        return result
+
+    @property
+    def directive( self ):
+        result = self.__cfg.get( C_DIRECTIVE, None )
         return result
 
     @property
@@ -76,6 +92,9 @@ class TemplateAction( TemplateBase ):
     @property
     def icon( self ):
         return self.__cfg.get( C_ICON, '' )
+
+    def hasIcon( self ):
+        return self.__cfg.get( C_ICON ) is not None
 
     @property
     def function( self ):
@@ -123,11 +142,16 @@ class TemplateAction( TemplateBase ):
 
     @property
     def route( self ) -> RouteTemplate:
-        return RouteTemplate( self, **self.__cfg.get( C_ROUTE, None ) ) if self.isAngularRoute() else None
+        return RouteTemplate( self, **self.__cfg.get( C_ROUTE, None ) ) if self.isAngularRoute() else None # {}
 
     @property
     def params( self ):
         return self.__cfg.get( C_PARAMS, {} )
+
+    def angularParams(self):
+        params = self.__cfg.get( C_PARAMS, {} )
+        # tems = params.items()
+        return TypeScript().build( params )
 
     def routeParams( self ) -> str:
         params = self.params
@@ -139,6 +163,20 @@ class TemplateAction( TemplateBase ):
             return '{{ queryParams: {} }}'.format( items )
 
         return '{ }'
+
+    @property
+    def width( self ):
+        return self.__cfg.get( 'width', "80%" )
+
+    def hasWidth( self ):
+        return self.__cfg.get( 'width' ) is not None
+
+    @property
+    def height( self ):
+        return self.__cfg.get( 'height', "80%" )
+
+    def hasHeight( self ):
+        return self.__cfg.get( 'height' ) is not None
 
     #
     #   Internal functions and properies to gencrud
@@ -158,13 +196,36 @@ class TemplateAction( TemplateBase ):
 
     def hasNgIf( self ):
         return "ngIf" in self.__cfg
+
+    def isDirective( self ):
+        # TODO: This is wrong !!!!!
+        return self.type == C_DIRECTIVE
     
     @property
     def ngIf( self ):
-        if self.hasNgIf():
-            return '*ngIf="{}"'.format( self.__cfg.get( 'ngIf', '' ) )
+        return self.__cfg.get( 'ngIf', 'true' )
 
-        return ''
+    def routingPath( self ) -> str:
+        route = ""
+        if self.isAngularRoute():
+            if isinstance( self.route.route, str ):
+                if self.route.route.startswith( '/' ):
+                    route = self.route.route[1:]
+                else:
+                    route = self.route.name[1:]
+            elif isinstance( self.route.name, str ):
+                route = "/".join( [ self.parent.name, self.route.name ] )
+            else:
+                route = "/".join( [ self.parent.name, self.name ] )
+
+        return route
+
+    def routingParams( self ) -> dict:
+        params = {}
+        if self.isAngularRoute():
+            params = self.route.params()
+        return "{" + ", ".join(['%s: %s' % (key, value) for (key, value) in params.items()]) + "}"
+
 
     def buttonObject( self ) -> str:
         tooltip = ''
@@ -255,10 +316,14 @@ class TemplateAction( TemplateBase ):
     def screenObject( self ):
         if self.__cfg.get( 'directive', None ) is not None:
             params = " ".join( [ '[{}]="{}"'.format( par, val ) for par, val in self.__cfg.get( 'params', {} ).items() ] )
-            if self.hasDisabed():
-                params += ' [disabled]="{}"'.format( self.disabled )
-            return '<{directive} name="{name}" tooltip="{label}" {control}></{directive}>'.format( **self.__cfg, control = params )
-
+            params += ' [disabled]="{}"'.format( self.disabled )
+            # define properties without binding to components attributes
+            unbindedProps = [("name", "name"), ("tooltip", "label")]
+            # only include props that were not defined already through params
+            unbindedProps = [prop for prop in unbindedProps if prop[0] not in self.__cfg.get( 'params', {} ).keys()]
+            # first, set unbinded props within inner format function, later set other code in outer format function
+            return ('<{directive} ' + " ".join([ '{}="{{{}}}"'.format(prop, val) for prop, val in unbindedProps ]) +
+             ' {control}></{directive}>').format( **self.__cfg, control = params )
         return ""
 
 
@@ -266,22 +331,22 @@ DEFAULT_NEW_ACTION      = TemplateAction( None,
                                           'internal_action',
                                           name = C_NEW,
                                           label = 'Add a new record',
-                                          type = C_SCREEN,
+                                          type = 'none',
                                           icon = 'add',
-                                          position = C_HEADER,
+                                          position = 'none',
                                           function = 'addRecord()' )
 DEFAULT_DELETE_ACTION   = TemplateAction( None,
                                           'internal_action',
                                           name = C_DELETE,
                                           label = 'Delete a record',
-                                          type = C_DIALOG,
+                                          type = 'none',
                                           icon = 'delete',
-                                          position = C_CELL,
+                                          position = 'none',
                                           function = 'deleteRecord( i, row )' )
 DEFAULT_EDIT_ACTION     = TemplateAction( None,
                                           'internal_action',
                                           name = C_EDIT,
                                           label = 'Edit a record',
-                                          type = C_SCREEN,
-                                          position = C_ROW,
+                                          type = 'none',
+                                          position = 'none',
                                           function = 'editRecord( i, row )' )

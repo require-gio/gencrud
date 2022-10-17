@@ -10,36 +10,62 @@ GENCRUD_SCHEME = {
     "properties": {
         'source': {
             'type': 'object',
-            "required": [ 'base', 'python', 'angular' ],
             "additionalProperties": False,
             'properties': {
                 'base': {
-                    'type': 'string'
+                    'type': 'string',
+                    'optional': True
                 },
                 'python': {
                     'type': 'string'
                 },
                 'angular': {
                     'type': 'string'
+                },
+                'unittest': {
+                    'type': 'string',
+                    'optional': True
                 }
             }
         },
         'templates': {
             'type': 'object',
-            "required": False,
+            "optional": True,
             "additionalProperties": False,
             'properties': {
                 'base': {
                     'type': 'string',
-                    "required": False,
+                    'optional': True
                 },
                 'python': {
                     'type': 'string',
-                    "required": True,
                 },
                 'angular': {
                     'type': 'string',
-                    "required": True,
+                },
+                'unittest': {
+                    'type': 'string',
+                    'optional': True
+                },
+                'common': {
+                    'type': 'object',
+                    "additionalProperties": False,
+                    'properties': {
+                        'base': {
+                            'type': 'string',
+                            'optional': True
+                        },
+                        'python': {
+                            'type': 'string',
+                        },
+                        'angular': {
+                            'type': 'string',
+                        },
+                        'unittest': {
+                            'type': 'string',
+                            'optional': True
+                        }
+                    }
                 }
             }
         },
@@ -226,7 +252,23 @@ GENCRUD_SCHEME = {
                         }
                     },
                     'ignore_templates': { 'type': 'array' },
-                    'injection': { 'type': 'object' },
+                    'injection': {
+                        'type': 'object',
+                        'properties': {
+                            'module.ts': {
+                                'type': 'object',
+                                'properties': {
+                                    'dialog': {
+                                        'type': 'object',
+                                        'properties': {
+                                            'class': { 'type': 'string' },
+                                            'file': { 'type': 'string' }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    },
                     'route': { 'type': 'string' },
                     'actions': {
                         'type': 'array',
@@ -242,13 +284,13 @@ GENCRUD_SCHEME = {
                                     'type': 'string',
                                 },
                                'type': {
-                                    'enum': [ 'screen', 'dialog', 'api', 'function', 'none' ],
+                                    'enum': [ 'screen', 'dialog', 'api', 'function', 'directive', 'none' ],
                                 },
                                 'icon': {
                                     'type': 'string',
                                 },
                                 'position': {
-                                    'enum': [ 'row', 'header', 'footer', 'cell', 'none', 'screen' ],
+                                    'enum': [ 'row', 'header', 'footer', 'cell', 'none', 'screen', 'sidebar' ],
                                 },
                                 'uri': {
                                     'type': 'string'
@@ -263,7 +305,7 @@ GENCRUD_SCHEME = {
                                     'type': 'integer'
                                 },
                                 'disabled': {
-                                    'type': 'string'
+                                    'type': ['string', 'boolean']
                                 },
                                 'ngIf': {
                                     'type': 'string'
@@ -402,6 +444,10 @@ GENCRUD_SCHEME = {
                             'name': {
                                 'type': 'string',
                             },
+                            'secondary-key': {
+                                'type': 'string',
+                                "optional": True
+                            },
                             'unique-key': { 'type': 'string' },
                             'viewSort': {
                                 'type': 'object',
@@ -457,6 +503,9 @@ GENCRUD_SCHEME = {
                                                         'caption': {
                                                             'type': 'boolean',
                                                         },
+                                                        'displayedColumns': {
+                                                            'type': 'string',
+                                                        },
                                                     }
                                                 }
                                             }
@@ -508,7 +557,13 @@ GENCRUD_SCHEME = {
                                                               'textarea', 'checkbox', 'password', 'date', 'time', 'datetime',
                                                               'label' ]
                                                 },
-                                                'format':{
+                                                'format': {
+                                                    'type': 'string'
+                                                },
+                                                'width': {
+                                                    'type': 'integer'
+                                                },
+                                                'group': {
                                                     'type': 'string'
                                                 },
                                                 'ngIf': {
@@ -533,6 +588,9 @@ GENCRUD_SCHEME = {
                                                             'type': 'string',
                                                         },
                                                         'path': {
+                                                            'type': 'string',
+                                                        },
+                                                        'base-class': {
                                                             'type': 'string',
                                                         },
                                                         'class': {
@@ -561,9 +619,40 @@ GENCRUD_SCHEME = {
                                                         },
                                                         'heightAdjust': {
                                                             'type': 'string',
+                                                        },
+                                                        'decodeFunc': {
+                                                            'type': 'string',
+                                                        },
+                                                        'encodeFunc': {
+                                                            'type': 'string',
+                                                        },
+                                                        'onSaveClick': {
+                                                            'type': 'string',
                                                         }
                                                     }
-                                                }
+                                                },
+                                                'actions': {
+                                                    'type': 'array',
+                                                    'items': {
+                                                        'type': 'object',
+                                                        'required': [ 'name', 'icon', 'position' ],
+                                                        "additionalProperties": False,
+                                                        'properties': {
+                                                            'name': {
+                                                                'type': 'string'
+                                                            },
+                                                            'icon': {
+                                                                'type': 'string'
+                                                            },
+                                                            'position': {
+                                                                'enum': [ 'row', 'left', 'right' ],
+                                                            },
+                                                            'function': {
+                                                                'type': 'string'
+                                                            },
+                                                        }
+                                                    }
+                                                },
                                             }
                                         },
                                         'listview': {
@@ -577,6 +666,12 @@ GENCRUD_SCHEME = {
                                                 'index': {
                                                     'type': 'integer'
                                                 },
+                                                'sort': {
+                                                    'type': 'boolean'
+                                                },
+                                                'filter': {
+                                                    'type': 'boolean'
+                                                }
                                             }
                                         },
                                         'tab': {
@@ -592,6 +687,187 @@ GENCRUD_SCHEME = {
                                                 }
                                             }
                                         },
+                                        'test-data': {
+                                            'type': 'object',
+                                            "optional": True,
+                                            "additionalProperties": False,
+                                            'properties': {
+                                                'value': {
+                                                    'type': ['string', 'boolean', 'integer', 'number', 'object', 'null'],
+                                                    "optional": True,
+                                                },
+                                                'values': {
+                                                    'type': 'array',
+                                                    "optional": True,
+                                                    'items': {
+                                                        'type': ['string', 'boolean', 'integer', 'number', 'object', 'null'],
+                                                    }
+                                                }
+                                            }
+                                        },
+                                        'siblings': {
+                                            'type': 'array',
+                                            'items': {
+                                                "type": "object",
+                                                "required": [ 'label' ],
+                                                "additionalProperties": False,
+                                                "properties": {
+                                                    'hint': {
+                                                        'type': 'string',
+                                                    },
+                                                    'readonly': {
+                                                        'type': 'boolean'
+                                                    },
+                                                    "remark": {
+                                                        'type': 'string'
+                                                    },
+                                                    'label': {
+                                                        'type': 'string'
+                                                    },
+                                                    'ui': {
+                                                        'type': 'object',
+                                                        'required': [ 'type' ],
+                                                        "additionalProperties": False,
+                                                        'properties': {
+                                                            'type': {
+                                                                "enum": [ 'textbox', 'editor', 'number', 'choice', 'choice-auto-complete',
+                                                                        'textarea', 'checkbox', 'password', 'date', 'time', 'datetime',
+                                                                        'label' ]
+                                                            },
+                                                            'format': {
+                                                                'type': 'string'
+                                                            },
+                                                            'width': {
+                                                                'type': 'integer'
+                                                            },
+                                                            'group': {
+                                                                'type': 'string'
+                                                            },
+                                                            'ngIf': {
+                                                                'type': 'string'
+                                                            },
+                                                            'hint': {
+                                                                'type': 'string'
+                                                            },
+                                                            'pipe': {
+                                                                'enum': [ 'date', 'datetime', 'time' ]
+                                                            },
+                                                            'cols': { 'type': 'integer', },
+                                                            'rows': { 'type': 'integer', },
+                                                            'resolve-list': {
+                                                                'type': 'object',
+                                                            },
+                                                            'service': {
+                                                                'type': 'object',
+                                                                "additionalProperties": False,
+                                                                'properties': {
+                                                                    'name': {
+                                                                        'type': 'string',
+                                                                    },
+                                                                    'path': {
+                                                                        'type': 'string',
+                                                                    },
+                                                                    'base-class': {
+                                                                        'type': 'string',
+                                                                    },
+                                                                    'class': {
+                                                                        'type': 'string',
+                                                                    },
+                                                                    'value': {
+                                                                        'type': 'string',
+                                                                    },
+                                                                    'label': {
+                                                                        'type': 'string',
+                                                                    },
+                                                                }
+                                                            },
+                                                            'attributes': {
+                                                                'type': 'object',
+                                                                "additionalProperties": False,
+                                                                'properties': {
+                                                                    'language': {
+                                                                        'enum': [ 'markdown',  'json', 'python', 'yaml', 'xml', 'sql', 'xpath' ]
+                                                                    },
+                                                                    'height': {
+                                                                        'type': 'string',
+                                                                    },
+                                                                    'minimap': {
+                                                                        'type': 'string',
+                                                                    },
+                                                                    'heightAdjust': {
+                                                                        'type': 'string',
+                                                                    },
+                                                                    'decodeFunc': {
+                                                                        'type': 'string',
+                                                                    },
+                                                                    'encodeFunc': {
+                                                                        'type': 'string',
+                                                                    },
+                                                                    'onSaveClick': {
+                                                                        'type': 'string',
+                                                                    }
+                                                                }
+                                                            },
+                                                            'actions': {
+                                                                'type': 'array',
+                                                                'items': {
+                                                                    'type': 'object',
+                                                                    'required': [ 'name', 'icon', 'position' ],
+                                                                    "additionalProperties": False,
+                                                                    'properties': {
+                                                                        'name': {
+                                                                            'type': 'string'
+                                                                        },
+                                                                        'icon': {
+                                                                            'type': 'string'
+                                                                        },
+                                                                        'position': {
+                                                                            'enum': [ 'row', 'left', 'right' ],
+                                                                        },
+                                                                        'function': {
+                                                                            'type': 'string'
+                                                                        },
+                                                                    }
+                                                                }
+                                                            },
+                                                        }
+                                                    },
+                                                    'listview': {
+                                                        'type': 'object',
+                                                        "additionalProperties": False,
+                                                        'required': [ 'width', 'index' ],
+                                                        'properties': {
+                                                            'width': {
+                                                                'type': 'string'
+                                                            },
+                                                            'index': {
+                                                                'type': 'integer'
+                                                            },
+                                                            'sort': {
+                                                                'type': 'boolean'
+                                                            },
+                                                            'filter': {
+                                                                'type': 'boolean'
+                                                            }
+                                                        }
+                                                    },
+                                                    'tab': {
+                                                        'type': 'object',
+                                                        "additionalProperties": False,
+                                                        'required': [ 'label', 'index' ],
+                                                        'properties': {
+                                                            'label': {
+                                                                'type': 'string'
+                                                            },
+                                                            'index': {
+                                                                'type': 'integer'
+                                                            }
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        },
+
                                         # TODO: These need to be removed
                                         'default': {
                                             'type': 'string'

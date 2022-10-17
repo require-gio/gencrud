@@ -22,7 +22,7 @@ import os
 import io
 import gencrud.util.utils
 from gencrud.config.object import TemplateObject, TemplateObjects
-from gencrud.config.source import TemplateSourcePython, TemplateSourceAngular
+from gencrud.config.source import TemplateSourcePython, TemplateSourceAngular, TemplateSourceUnittest
 from gencrud.config.options import TemplateOptions
 from gencrud.config.references import TemplateReferences
 from gencrud.config.dynamic.controls import DymanicControls
@@ -101,8 +101,15 @@ class TemplateConfiguration( object ):
 
         else:
             self.__config       = cfg
+        
+        # in case there is a 'defaults' field specified, we need to concat
+        # its content with the root dict. This is a workaround since
+        # include cannot be used at root level alongside other fields
+        if C_DEFAULTS in self.__config:
+            self.__config = dict(self.__config[C_DEFAULTS], **self.__config)
+            del self.__config[C_DEFAULTS]
 
-        # TODO: Veryfy the loaded template against the schema
+        # Veryfy the loaded template against the schema
         try:
             jsonschema.Draft7Validator(GENCRUD_SCHEME)
             jsonschema.validate(instance=self.__config, schema=GENCRUD_SCHEME)
@@ -126,12 +133,12 @@ class TemplateConfiguration( object ):
         # the output location is
         self.__python       = TemplateSourcePython( **self.__config )
         self.__angular      = TemplateSourceAngular( **self.__config )
+        self.__unittest     = TemplateSourceUnittest( **self.__config )
         opts                = self.__config[ C_REFERENCES ] if C_REFERENCES in self.__config else { }
         self.__references   = TemplateReferences( **opts )
         self.__objects      = []
         for obj in self.__config[ C_OBJECTS ]:
             self.__objects.append( TemplateObject( self, **obj ) )
-
         return
 
     @property
@@ -149,6 +156,10 @@ class TemplateConfiguration( object ):
     @property
     def angular( self ) -> TemplateSourceAngular:
         return self.__angular
+
+    @property
+    def unittest( self ) -> TemplateSourceUnittest:
+        return self.__unittest
 
     @property
     def objects( self ) -> TemplateObjects:

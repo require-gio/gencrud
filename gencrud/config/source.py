@@ -18,9 +18,11 @@
 #
 import os
 from gencrud.util.exceptions import (MissingTemplate,
+                                     MissingCommon,
                                      MissingSourceFolder,
                                      KeyNotFoundException,
                                      MissingTemplateFolder,
+                                     MissingCommonFolder,
                                      PathNotFoundException)
 from gencrud.util.utils import get_platform
 from gencrud.constants import *
@@ -38,13 +40,34 @@ class TemplateSource( TemplateBase ):
         self.__key = tp
         self.__source = self.__config.get( platf, self.__config ).get( C_SOURCE, {} )
         # if there is no templates directory specified, the gencrud default templates will be used
-        self.__template = self.__config.get( platf, self.__config ).get( C_TEMPLATE,
-                        os.path.abspath( os.path.join( os.path.dirname( __file__ ), '..', C_TEMPLATES_DIR ) ) )
+        self.__template = self.__config.get( platf, self.__config ).get( C_TEMPLATES_DIR, {} )
         return
 
     @property
-    def baseFolder( self ) -> str:
+    def sourceBaseFolder( self ) -> str:
         folder = self.__source.get( C_BASE, os.getcwd() )
+
+        # if not folder.startswith( os.path.pathsep ):
+        #    folder = os.path.abspath( os.path.join(os.getcwd(), folder ) )
+
+        if not os.path.isdir( folder ):
+            raise PathNotFoundException( folder )
+
+        return folder
+
+    @property
+    def templateBaseFolder( self ) -> str:
+        folder = self.__template.get( C_BASE, os.getcwd() )
+
+        if not os.path.isdir( folder ):
+            raise PathNotFoundException( folder )
+
+        return folder
+
+    @property
+    def commonBaseFolder( self ) -> str:
+        folder = self.__template.get( C_COMMON, {} ).get( C_BASE, os.getcwd() )
+
         if not os.path.isdir( folder ):
             raise PathNotFoundException( folder )
 
@@ -59,8 +82,8 @@ class TemplateSource( TemplateBase ):
         if not folder.startswith( os.path.pathsep ):
             # not absolute path
             # first test with baseFolder
-            if os.path.isdir( os.path.join( self.baseFolder, folder ) ):
-                folder = os.path.join( self.baseFolder, folder )
+            if os.path.isdir( os.path.join( self.sourceBaseFolder, folder ) ):
+                folder = os.path.join( self.sourceBaseFolder, folder )
 
             folder = os.path.abspath( folder )
 
@@ -71,7 +94,19 @@ class TemplateSource( TemplateBase ):
 
     @property
     def templateFolder( self ) -> str:
-        folder = os.path.join( self.__template, self.__key )
+        folder = self.__template.get( self.__key, None )
+        # if template folder not specified take default
+        if folder is None:
+            folder = os.path.abspath( os.path.join( os.path.dirname( __file__ ), '..', C_TEMPLATES_DIR ) )
+
+        if not folder.startswith( os.path.pathsep ):
+            # not absolute path
+            # first test with baseFolder
+            if os.path.isdir( os.path.join( self.templateBaseFolder, folder ) ):
+                folder = os.path.join( self.templateBaseFolder, folder )
+
+            folder = os.path.abspath( folder )
+
         if not os.path.isdir( folder ):
             raise MissingTemplateFolder( folder )
 
@@ -82,7 +117,30 @@ class TemplateSource( TemplateBase ):
                 cnt += 1
 
         if cnt == 0:
-            raise MissingTemplate( self.__template )
+            raise MissingTemplate( folder )
+
+        return folder
+
+    @property
+    def commonFolder( self ) -> str:
+        folder = self.__template.get( C_COMMON, {} ).get( self.__key, None )
+        # if there is no common templates directory specified, the gencrud default common will be used
+        if folder is None:
+            folder = os.path.abspath( os.path.join( os.path.dirname( __file__ ), '..', C_TEMPLATES_DIR, C_COMMON, self.__key ) )
+
+        if not folder.startswith( os.path.pathsep ):
+            # not absolute path
+            # first test with baseFolder
+            if os.path.isdir( os.path.join( self.commonBaseFolder, folder ) ):
+                folder = os.path.join( self.commonBaseFolder, folder )
+
+            folder = os.path.abspath( folder )
+
+        if not os.path.isdir( folder ):
+            raise MissingCommonFolder( folder )
+
+        # Now check if the common templates exists
+        # TODO
 
         return folder
 
@@ -93,7 +151,8 @@ class TemplateSource( TemplateBase ):
         template = {templ}>""".format( key      = self.__key,
                                        src      = self.sourceFolder,
                                        templ    = self.templateFolder,
-                                       base     = self.baseFolder )
+                                       common   = self.commonFolder,
+                                       base     = self.sourceBaseFolder )
 
 
 class TemplateSourcePython( TemplateSource ):
@@ -105,4 +164,9 @@ class TemplateSourcePython( TemplateSource ):
 class TemplateSourceAngular( TemplateSource ):
     def __init__( self, **cfg ):
         TemplateSource.__init__( self, C_ANGULAR, **cfg )
+        return
+
+class TemplateSourceUnittest( TemplateSource ):
+    def __init__( self, **cfg ):
+        TemplateSource.__init__( self, C_UNITTEST, **cfg )
         return

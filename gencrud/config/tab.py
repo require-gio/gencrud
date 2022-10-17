@@ -32,7 +32,7 @@ class TemplateTab( TemplateBase ):
 
     @property
     def index( self ):
-        return self.__cfg.get( C_INDEX, None )
+        return self.__cfg.get( C_INDEX, 0 ) # or None
 
     @property
     def label( self ):
@@ -47,13 +47,21 @@ class TemplateTabs( TemplateBase ):
     def __init__( self, parent, **cfg ):
         TemplateBase.__init__( self, parent )
         self.__cfg      = cfg
-        self.__fields   = { l: [] for l in self.labels }
+        self.__fields   = { l: [] for l in (self.labels + [C_NOTAB]) }
         self.__comps    = { l: None for l in self.labels }
         self.__params   = { l: None for l in self.labels }
         for col in self.parent.columns:
             if col.hasTab:
-                logging.debug( "Column tab: {}".format( col.tab ) )
+                logging.info( col.tab )
                 self.__fields[ col.tab.label ].append( col )
+            else:
+                self.__fields[ C_NOTAB ].append( col )
+            for sibling in col.siblings:
+                if sibling.hasTab:
+                    logging.info( sibling.tab )
+                    self.__fields[ sibling.tab.label ].append( col )
+                else:
+                    self.__fields[ C_NOTAB ].append( sibling )
 
         for key in self.__fields.keys():
             self.__fields[ key ].sort( key = lambda x: x.tab.index, reverse = False )
@@ -69,7 +77,7 @@ class TemplateTabs( TemplateBase ):
         if isinstance( self.__cfg, ( list, tuple ) ):
             return self.__cfg
 
-        return self.__cfg.get( C_LABELS, None )
+        return self.__cfg.get( C_LABELS, [] )
 
     @property
     def tabTag( self ):
@@ -84,8 +92,9 @@ class TemplateTabs( TemplateBase ):
         return self.__cfg.get( C_TAB_GROUP_TAG, 'mat-tab-group' )
 
     def fieldsFor( self, label ):
-        result = self.__fields[ label ]
-        return result
+        if label == None:
+            return self.__fields[ "notab" ]
+        return self.__fields[ label ]
 
     def hasComponent( self, label ):
         value = self.__comps.get( label, None )
@@ -101,16 +110,25 @@ class TemplateTabs( TemplateBase ):
 
         return value
 
-    def params( self, label ):
+    def params( self, label, mode = None ):
         result = ''
         for key, value in self.__params[ label ].items():
-            value = self.variable2typescript( value )
-            result += '[{}]="{}" '.format( key, value )
+            value = str(self.variable2typescript( value )).replace("'", "").replace("\"", "") if \
+                "[" not in str(value) else str(self.variable2typescript( value )) 
+            if key in ( 'value', 'displayedColumns' ):
+                result += '[{}]="{}" '.format( key, value )
+
+            else:
+                result += '{}="{}" '.format( key, value )
+
             if key == C_VALUE:
                 if '.' in value:
                     this, _ = value.split( '.', 1 )
                     value = "{} && {}".format( this, value )
 
                 result += '*ngIf="{}" '.format( value )
+
+        if isinstance(mode, str):
+            result += ' mode="{}" '.format( mode )
 
         return result
